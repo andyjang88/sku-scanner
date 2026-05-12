@@ -504,6 +504,9 @@
   let currentAction = 'add'; // 'add' or 'sell'
   let sessionCount = 0;
   let scanHistory = [];
+  // ── YOUR APPS SCRIPT URL (hardcoded so you never have to paste it) ──
+  const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwHLYNuUu64aK6CU-ZsMBy9syL85UJBMhfSgrhaIYruj9TAJEfoXlzMCuSQq8dxAcXi/exec';
+
   let scriptUrl = '';
   let recentBarcodes = new Map();
   let lastSentItem = null;
@@ -512,6 +515,8 @@
   // ── Init ──
   try { scanHistory = JSON.parse(localStorage.getItem('scanHistory2') || '[]'); } catch(e) { scanHistory = []; }
   try { scriptUrl = localStorage.getItem('scriptUrl') || ''; } catch(e) { scriptUrl = ''; }
+  // Use hardcoded URL as fallback
+  if (!scriptUrl) scriptUrl = DEFAULT_SCRIPT_URL;
 
   window.addEventListener('DOMContentLoaded', () => {
     if (scriptUrl) {
