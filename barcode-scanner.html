@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>SKU Barcode Scanner</title>
+<title>SKU Inventory Scanner</title>
 
 <!-- PWA -->
 <link rel="manifest" href="./manifest.json">
@@ -17,138 +17,155 @@
 <style>
   :root {
     --primary: #1a73e8;
-    --primary-dark: #1557b0;
-    --success: #0d904f;
-    --bg: #0f0f0f;
-    --card: #1e1e1e;
+    --success: #34a853;
+    --sold: #ea4335;
+    --bg: #0a0a0a;
+    --card: #161616;
+    --card-border: #2a2a2a;
     --text: #f0f0f0;
-    --text-secondary: #9aa0a6;
-    --border: #333;
-    --danger: #d93025;
-    --accent: #34a853;
+    --text-dim: #888;
+    --accent-add: #34a853;
+    --accent-sell: #ea4335;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
-
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
     overflow-x: hidden;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   /* ── HEADER ── */
   header {
     background: #000;
-    padding: 12px 20px;
+    padding: 10px 16px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     position: sticky;
     top: 0;
     z-index: 100;
-    border-bottom: 1px solid #222;
+    border-bottom: 1px solid #1a1a1a;
   }
-  .header-left h1 { font-size: 18px; font-weight: 700; }
-  .header-left p { font-size: 11px; color: var(--text-secondary); }
-  .header-right { display: flex; align-items: center; gap: 12px; }
+  .header-left h1 { font-size: 17px; font-weight: 700; }
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+  .status-pill.connected { background: #0d3320; color: var(--success); }
+  .status-pill.disconnected { background: #3d1111; color: var(--sold); }
+  .status-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
+  .connected .status-dot { background: var(--success); }
+  .disconnected .status-dot { background: var(--sold); }
   .settings-btn {
-    background: none; border: none; color: var(--text-secondary);
+    background: none; border: none; color: var(--text-dim);
     font-size: 22px; cursor: pointer; padding: 4px;
   }
 
-  /* ── LIVE COUNTER ── */
-  .scan-counter {
-    text-align: center;
-    padding: 8px;
-    font-size: 13px;
-    color: var(--text-secondary);
+  /* ── ACTION MODE TOGGLE ── */
+  .action-toggle {
+    display: flex;
+    margin: 10px 12px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 2px solid var(--card-border);
     background: #000;
   }
-  .scan-counter .count {
-    font-size: 32px;
+  .action-btn {
+    flex: 1;
+    padding: 14px 8px;
+    border: none;
+    font-size: 15px;
     font-weight: 800;
-    color: var(--accent);
-    display: block;
-    line-height: 1;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text-dim);
+    transition: all 0.2s;
+    text-align: center;
+    letter-spacing: 0.5px;
+  }
+  .action-btn.active-add {
+    background: var(--accent-add);
+    color: white;
+    border-radius: 12px;
+    box-shadow: 0 0 20px rgba(52,168,83,0.3);
+  }
+  .action-btn.active-sell {
+    background: var(--accent-sell);
+    color: white;
+    border-radius: 12px;
+    box-shadow: 0 0 20px rgba(234,67,53,0.3);
   }
 
-  /* ── MODE TOGGLE ── */
-  .mode-bar {
-    display: flex;
-    gap: 0;
-    margin: 12px 16px;
-    border-radius: 10px;
-    overflow: hidden;
-    border: 1px solid var(--border);
+  /* ── SCAN COUNTER ── */
+  .scan-counter {
+    text-align: center;
+    padding: 6px 0;
+    font-size: 12px;
+    color: var(--text-dim);
   }
-  .mode-btn {
-    flex: 1;
-    padding: 10px;
-    border: none;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    background: var(--card);
-    color: var(--text-secondary);
-    transition: all 0.15s;
+  .scan-counter .count {
+    font-size: 28px;
+    font-weight: 900;
+    display: block;
+    line-height: 1;
+    transition: color 0.2s;
   }
-  .mode-btn.active {
-    background: var(--primary);
-    color: white;
-  }
+  .count-add { color: var(--accent-add); }
+  .count-sell { color: var(--accent-sell); }
 
   /* ── SCANNER ── */
   .scanner-wrap {
     position: relative;
     background: #000;
-    margin: 0 16px 12px;
+    margin: 0 12px 10px;
     border-radius: 16px;
     overflow: hidden;
-    border: 2px solid var(--border);
+    border: 3px solid var(--card-border);
+    transition: border-color 0.3s;
   }
-  .scanner-wrap.rapid-active { border-color: var(--accent); }
+  .scanner-wrap.mode-add { border-color: var(--accent-add); }
+  .scanner-wrap.mode-sell { border-color: var(--accent-sell); }
   #reader { width: 100%; }
   #reader video { border-radius: 0 !important; }
 
   .scanner-overlay {
     position: absolute;
-    top: 10px; left: 10px; right: 10px;
+    top: 8px; left: 8px; right: 8px;
     display: flex;
     justify-content: space-between;
     z-index: 10;
     pointer-events: none;
   }
   .mode-badge {
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
   }
-  .mode-badge.rapid { background: var(--accent); color: white; }
-  .mode-badge.manual { background: var(--primary); color: white; }
-  .cooldown-badge {
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 600;
-    background: rgba(0,0,0,0.7);
-    color: var(--text-secondary);
-    display: none;
-  }
-  .cooldown-badge.show { display: block; color: #fbbf24; }
+  .badge-add { background: var(--accent-add); color: white; }
+  .badge-sell { background: var(--accent-sell); color: white; }
 
-  .start-btn-wrap { padding: 12px 16px; }
+  .start-btn-wrap { padding: 8px 12px; }
   .btn {
     width: 100%;
-    padding: 14px;
+    padding: 16px;
     border: none;
-    border-radius: 12px;
-    font-size: 16px;
-    font-weight: 700;
+    border-radius: 14px;
+    font-size: 17px;
+    font-weight: 800;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -157,373 +174,304 @@
     transition: all 0.15s;
   }
   .btn:active { transform: scale(0.97); }
-  .btn-go { background: var(--accent); color: white; font-size: 18px; }
-  .btn-stop { background: var(--danger); color: white; }
-  .btn-primary { background: var(--primary); color: white; }
+  .btn-go-add { background: var(--accent-add); color: white; }
+  .btn-go-sell { background: var(--accent-sell); color: white; }
+  .btn-stop { background: #333; color: white; border: 2px solid #555; }
 
-  /* ── LAST SCAN POPUP ── */
+  /* ── BIG SCAN CONFIRMATION OVERLAY ── */
+  .scan-confirm {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+  }
+  .scan-confirm.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .scan-confirm.confirm-add { background: rgba(52, 168, 83, 0.92); }
+  .scan-confirm.confirm-sell { background: rgba(234, 67, 53, 0.92); }
+  .scan-confirm .big-icon {
+    font-size: 80px;
+    animation: popBounce 0.4s ease;
+  }
+  .scan-confirm .big-label {
+    font-size: 24px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-top: 8px;
+    color: white;
+  }
+  .scan-confirm .big-barcode {
+    font-family: 'SF Mono', 'Courier New', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    margin-top: 12px;
+    color: rgba(255,255,255,0.9);
+    background: rgba(0,0,0,0.2);
+    padding: 8px 20px;
+    border-radius: 10px;
+  }
+  .scan-confirm .big-product {
+    font-size: 16px;
+    margin-top: 8px;
+    color: rgba(255,255,255,0.8);
+    max-width: 300px;
+    text-align: center;
+  }
+  @keyframes popBounce {
+    0% { transform: scale(0.3); opacity: 0; }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* ── LAST SCAN BAR ── */
   .last-scan {
-    margin: 0 16px 12px;
+    margin: 0 12px 10px;
     background: var(--card);
     border-radius: 12px;
-    border: 1px solid var(--border);
-    overflow: hidden;
+    border: 1px solid var(--card-border);
     display: none;
-    animation: popIn 0.2s ease;
+    animation: slideIn 0.2s ease;
   }
   .last-scan.show { display: block; }
-  @keyframes popIn {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
   }
   .last-scan-inner {
     display: flex;
     align-items: center;
-    padding: 12px 16px;
-    gap: 12px;
+    padding: 10px 14px;
+    gap: 10px;
   }
-  .last-scan-check {
-    width: 36px; height: 36px;
+  .last-scan-icon {
+    width: 34px; height: 34px;
     border-radius: 50%;
-    background: var(--accent);
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
+    font-size: 16px;
     flex-shrink: 0;
   }
+  .icon-add { background: var(--accent-add); }
+  .icon-sell { background: var(--accent-sell); }
   .last-scan-info { flex: 1; min-width: 0; }
   .last-scan-barcode {
-    font-family: 'SF Mono', 'Courier New', monospace;
-    font-size: 15px;
+    font-family: 'SF Mono', monospace;
+    font-size: 14px;
     font-weight: 700;
   }
   .last-scan-product {
-    font-size: 13px;
-    color: var(--text-secondary);
+    font-size: 12px;
+    color: var(--text-dim);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .undo-btn {
-    padding: 6px 14px;
-    background: #333;
-    border: 1px solid #555;
+    padding: 5px 12px;
+    background: #222;
+    border: 1px solid #444;
     border-radius: 8px;
     color: #fbbf24;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 11px;
+    font-weight: 700;
     cursor: pointer;
     flex-shrink: 0;
   }
-  .undo-btn:active { background: #444; }
-
-  /* ── MANUAL REVIEW PANEL (for review mode) ── */
-  .review-panel {
-    margin: 0 16px 12px;
-    background: var(--card);
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    padding: 16px;
-    display: none;
-  }
-  .review-panel.show { display: block; }
-  .review-barcode {
-    font-family: 'SF Mono', monospace;
-    font-size: 24px;
-    font-weight: 700;
-    margin-bottom: 4px;
-  }
-  .review-product {
-    font-size: 14px;
-    color: var(--text-secondary);
-    margin-bottom: 12px;
-    min-height: 20px;
-  }
-  .review-product.loading { font-style: italic; }
-  .review-fields { display: flex; flex-direction: column; gap: 10px; }
-  .review-fields label { font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-  .review-fields input {
-    width: 100%;
-    padding: 10px 12px;
-    background: #111;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
-    font-size: 15px;
-  }
-  .review-fields input:focus { outline: none; border-color: var(--primary); }
-  .quantity-row { display: flex; align-items: center; gap: 16px; }
-  .qty-btn {
-    width: 38px; height: 38px;
-    border-radius: 50%;
-    border: 1px solid var(--border);
-    background: #111;
-    color: var(--text);
-    font-size: 20px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .qty-btn:active { background: #333; }
-  .qty-value { font-size: 22px; font-weight: 700; min-width: 40px; text-align: center; }
-  .review-actions { display: flex; gap: 8px; margin-top: 14px; }
-  .review-actions .btn { flex: 1; padding: 12px; font-size: 14px; }
-  .btn-send { background: var(--accent); color: white; }
-  .btn-skip { background: #333; color: var(--text-secondary); }
 
   /* ── MANUAL ENTRY ── */
   .manual-entry {
-    margin: 0 16px 12px;
+    margin: 0 12px 10px;
     background: var(--card);
     border-radius: 12px;
-    border: 1px solid var(--border);
-    padding: 14px;
+    border: 1px solid var(--card-border);
+    padding: 12px;
   }
-  .manual-entry h3 { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .manual-entry h3 {
+    font-size: 11px; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+  }
   .manual-row { display: flex; gap: 8px; }
   .manual-row input {
-    flex: 1;
-    padding: 10px 12px;
-    background: #111;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
-    font-size: 16px;
-    font-family: 'SF Mono', monospace;
+    flex: 1; padding: 10px 12px;
+    background: #0a0a0a; border: 1px solid var(--card-border);
+    border-radius: 8px; color: var(--text);
+    font-size: 16px; font-family: 'SF Mono', monospace;
   }
   .manual-row input:focus { outline: none; border-color: var(--primary); }
   .manual-row button {
-    padding: 10px 16px;
-    background: var(--primary);
-    border: none;
-    border-radius: 8px;
-    color: white;
-    font-size: 16px;
-    cursor: pointer;
+    padding: 10px 18px; border: none; border-radius: 8px;
+    color: white; font-size: 16px; font-weight: 700; cursor: pointer;
   }
+  .manual-btn-add { background: var(--accent-add); }
+  .manual-btn-sell { background: var(--accent-sell); }
 
-  /* ── FEED (scrolling log) ── */
+  /* ── FEED ── */
   .feed {
-    margin: 0 16px 120px;
+    margin: 0 12px 120px;
     background: var(--card);
     border-radius: 12px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--card-border);
     overflow: hidden;
   }
   .feed-header {
-    padding: 12px 16px;
+    padding: 10px 14px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--card-border);
   }
-  .feed-header h3 { font-size: 13px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+  .feed-header h3 { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
   .feed-count {
-    background: var(--primary);
-    color: white;
-    padding: 2px 10px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 600;
+    padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 700; color: white;
   }
+  .feed-count-add { background: var(--accent-add); }
+  .feed-count-sell { background: var(--accent-sell); }
   .feed-list { max-height: 300px; overflow-y: auto; }
   .feed-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 16px;
-    border-bottom: 1px solid #1a1a1a;
+    padding: 9px 14px;
+    border-bottom: 1px solid #111;
   }
   .feed-item:last-child { border-bottom: none; }
-  .feed-item .fi-barcode { font-family: 'SF Mono', monospace; font-size: 13px; font-weight: 600; }
-  .feed-item .fi-product { font-size: 12px; color: var(--text-secondary); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
-  .feed-item .fi-right { text-align: right; flex-shrink: 0; }
-  .feed-item .fi-time { font-size: 10px; color: var(--text-secondary); }
-  .feed-item .fi-status { font-size: 14px; }
-  .feed-empty {
-    text-align: center;
-    padding: 24px;
-    color: var(--text-secondary);
-    font-size: 13px;
+  .feed-item .fi-barcode { font-family: 'SF Mono', monospace; font-size: 12px; font-weight: 600; }
+  .feed-item .fi-product { font-size: 11px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+  .feed-item .fi-action {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 6px; letter-spacing: 0.5px;
   }
+  .fi-action-add { background: rgba(52,168,83,0.15); color: var(--accent-add); }
+  .fi-action-sell { background: rgba(234,67,53,0.15); color: var(--accent-sell); }
+  .feed-item .fi-time { font-size: 9px; color: var(--text-dim); margin-top: 2px; }
+  .feed-empty { text-align: center; padding: 20px; color: var(--text-dim); font-size: 13px; }
 
-  /* ── SETUP BANNER ── */
+  /* ── SETUP ── */
   .setup-banner {
-    margin: 12px 16px;
-    background: #332b00;
-    border: 1px solid #665500;
+    margin: 10px 12px;
+    background: #1a1500;
+    border: 1px solid #3d3300;
     border-radius: 12px;
-    padding: 14px;
+    padding: 12px;
     display: none;
   }
   .setup-banner.show { display: block; }
-  .setup-banner h3 { font-size: 13px; color: #fbbf24; margin-bottom: 6px; }
-  .setup-banner p { font-size: 12px; color: #d4a017; line-height: 1.4; }
-  .setup-input-row { display: flex; gap: 8px; margin-top: 10px; }
+  .setup-banner h3 { font-size: 12px; color: #fbbf24; margin-bottom: 6px; }
+  .setup-banner p { font-size: 11px; color: #b8960f; line-height: 1.4; }
+  .setup-input-row { display: flex; gap: 8px; margin-top: 8px; }
   .setup-input-row input {
-    flex: 1;
-    padding: 10px 12px;
-    border: 1px solid #665500;
-    border-radius: 8px;
-    font-size: 13px;
-    background: #1e1800;
-    color: var(--text);
+    flex: 1; padding: 10px; border: 1px solid #3d3300; border-radius: 8px;
+    font-size: 12px; background: #0d0b00; color: var(--text);
   }
   .setup-input-row button {
-    padding: 10px 16px;
-    background: #fbbf24;
-    color: #332b00;
-    border: none;
-    border-radius: 8px;
-    font-weight: 700;
-    font-size: 13px;
-    cursor: pointer;
+    padding: 10px 14px; background: #fbbf24; color: #1a1500;
+    border: none; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer;
+  }
+  .setup-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .setup-actions button {
+    flex: 1; padding: 8px; border: 1px solid #3d3300; border-radius: 8px;
+    background: #1a1500; color: #fbbf24; font-size: 11px; font-weight: 600; cursor: pointer;
   }
 
   /* ── TOAST ── */
   .toast {
-    position: fixed;
-    top: 70px;
-    left: 50%;
+    position: fixed; top: 60px; left: 50%;
     transform: translateX(-50%) translateY(-80px);
-    padding: 10px 20px;
-    border-radius: 10px;
-    color: white;
-    font-size: 13px;
-    font-weight: 600;
-    z-index: 1000;
-    transition: transform 0.25s ease;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    padding: 8px 18px; border-radius: 10px;
+    color: white; font-size: 13px; font-weight: 600;
+    z-index: 300; transition: transform 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     pointer-events: none;
   }
   .toast.show { transform: translateX(-50%) translateY(0); }
-  .toast.success { background: var(--accent); }
-  .toast.error { background: var(--danger); }
-
-  /* ── FLASH ── */
-  .scan-flash {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(52, 168, 83, 0.2);
-    z-index: 50;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.1s;
-  }
-  .scan-flash.active { opacity: 1; }
-
-  /* ── STATUS PILL ── */
-  .status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-  }
-  .status-pill.connected { background: #0d3320; color: var(--accent); }
-  .status-pill.disconnected { background: #3d1111; color: var(--danger); }
-  .status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
-  .connected .status-dot { background: var(--accent); }
-  .disconnected .status-dot { background: var(--danger); }
+  .toast.success { background: var(--success); }
+  .toast.error { background: var(--sold); }
+  .toast.info { background: var(--primary); }
 </style>
 </head>
 <body>
 
-<div class="scan-flash" id="scanFlash"></div>
 <div class="toast" id="toast"></div>
+
+<!-- Big scan confirmation overlay -->
+<div class="scan-confirm" id="scanConfirm">
+  <div class="big-icon" id="confirmIcon"></div>
+  <div class="big-label" id="confirmLabel"></div>
+  <div class="big-barcode" id="confirmBarcode"></div>
+  <div class="big-product" id="confirmProduct"></div>
+</div>
 
 <header>
   <div class="header-left">
-    <h1>SKU Scanner</h1>
+    <h1>SKU Inventory</h1>
     <span class="status-pill disconnected" id="statusPill">
       <span class="status-dot"></span>
       <span id="statusText">Not connected</span>
     </span>
   </div>
-  <div class="header-right">
-    <button class="settings-btn" onclick="toggleSetup()" title="Settings">&#9881;</button>
-  </div>
+  <button class="settings-btn" onclick="toggleSetup()" title="Settings">&#9881;</button>
 </header>
-
-<!-- Live counter -->
-<div class="scan-counter">
-  <span class="count" id="liveCount">0</span>
-  items scanned this session
-</div>
 
 <!-- Setup -->
 <div class="setup-banner" id="setupBanner">
   <h3>&#9889; Connect to Google Sheets</h3>
-  <p>Paste your Apps Script Web App URL. See the setup instructions for how to get it.</p>
+  <p>Paste your Apps Script Web App URL below.</p>
   <div class="setup-input-row">
     <input type="url" id="scriptUrl" placeholder="https://script.google.com/macros/s/..." />
     <button onclick="saveScriptUrl()">Save</button>
   </div>
+  <div class="setup-actions">
+    <button onclick="setupSheet()">&#9881; Setup Sheet Structure</button>
+  </div>
 </div>
 
-<!-- Mode toggle -->
-<div class="mode-bar">
-  <button class="mode-btn active" id="modeRapid" onclick="setMode('rapid')">&#9889; Rapid Fire</button>
-  <button class="mode-btn" id="modeReview" onclick="setMode('review')">&#9998; Review Each</button>
+<!-- Action Mode Toggle -->
+<div class="action-toggle" id="actionToggle">
+  <button class="action-btn active-add" id="btnAdd" onclick="setAction('add')">+ ADD STOCK</button>
+  <button class="action-btn" id="btnSell" onclick="setAction('sell')">MARK SOLD</button>
 </div>
 
-<!-- Scanner viewport -->
-<div class="scanner-wrap" id="scannerWrap">
+<!-- Counter -->
+<div class="scan-counter">
+  <span class="count count-add" id="liveCount">0</span>
+  <span id="counterLabel">items added this session</span>
+</div>
+
+<!-- Scanner -->
+<div class="scanner-wrap mode-add" id="scannerWrap">
   <div class="scanner-overlay">
-    <span class="mode-badge rapid" id="modeBadge">RAPID</span>
-    <span class="cooldown-badge" id="cooldownBadge">Ready</span>
+    <span class="mode-badge badge-add" id="modeBadge">ADD STOCK</span>
   </div>
   <div id="reader"></div>
 </div>
 
 <div class="start-btn-wrap">
-  <button class="btn btn-go" id="startBtn" onclick="toggleScanner()">
+  <button class="btn btn-go-add" id="startBtn" onclick="toggleScanner()">
     &#9654; Start Scanning
   </button>
 </div>
 
-<!-- Last scan popup (rapid mode) -->
+<!-- Last scan -->
 <div class="last-scan" id="lastScan">
   <div class="last-scan-inner">
-    <div class="last-scan-check">&#10003;</div>
+    <div class="last-scan-icon icon-add" id="lastIcon">&#10003;</div>
     <div class="last-scan-info">
       <div class="last-scan-barcode" id="lastBarcode">-</div>
       <div class="last-scan-product" id="lastProduct">-</div>
     </div>
     <button class="undo-btn" onclick="undoLastScan()">Undo</button>
-  </div>
-</div>
-
-<!-- Review panel (review mode) -->
-<div class="review-panel" id="reviewPanel">
-  <div class="review-barcode" id="reviewBarcode"></div>
-  <div class="review-product loading" id="reviewProduct">Looking up...</div>
-  <div class="review-fields">
-    <div>
-      <label>Product Name</label>
-      <input type="text" id="productName" placeholder="Product name">
-    </div>
-    <div>
-      <label>Quantity</label>
-      <div class="quantity-row">
-        <button class="qty-btn" onclick="adjustQty(-1)">-</button>
-        <span class="qty-value" id="qtyValue">1</span>
-        <button class="qty-btn" onclick="adjustQty(1)">+</button>
-      </div>
-    </div>
-    <div>
-      <label>Notes</label>
-      <input type="text" id="itemNotes" placeholder="Optional note...">
-    </div>
-  </div>
-  <div class="review-actions">
-    <button class="btn btn-skip" onclick="skipReview()">Skip</button>
-    <button class="btn btn-send" onclick="submitReview()">&#10003; Send</button>
   </div>
 </div>
 
@@ -534,15 +482,15 @@
     <input type="text" id="manualBarcode" placeholder="Type barcode..."
            inputmode="numeric" pattern="[0-9]*"
            onkeydown="if(event.key==='Enter') manualEntry()">
-    <button onclick="manualEntry()">&#10003;</button>
+    <button class="manual-btn-add" id="manualBtn" onclick="manualEntry()">&#10003;</button>
   </div>
 </div>
 
-<!-- Scan feed -->
+<!-- Feed -->
 <div class="feed">
   <div class="feed-header">
-    <h3>Scan Log</h3>
-    <span class="feed-count" id="feedCount">0</span>
+    <h3>Session Log</h3>
+    <span class="feed-count feed-count-add" id="feedCount">0</span>
   </div>
   <div class="feed-list" id="feedList">
     <div class="feed-empty">Scans will appear here</div>
@@ -553,17 +501,16 @@
   // ── State ──
   let scanner = null;
   let isScanning = false;
-  let mode = 'rapid'; // 'rapid' or 'review'
-  let quantity = 1;
+  let currentAction = 'add'; // 'add' or 'sell'
   let sessionCount = 0;
   let scanHistory = [];
   let scriptUrl = '';
-  let recentBarcodes = new Map(); // barcode -> timestamp (cooldown tracker)
+  let recentBarcodes = new Map();
   let lastSentItem = null;
-  const COOLDOWN_MS = 3000; // 3s cooldown per barcode to avoid double-scans
+  const COOLDOWN_MS = 3000;
 
   // ── Init ──
-  try { scanHistory = JSON.parse(localStorage.getItem('scanHistory') || '[]'); } catch(e) { scanHistory = []; }
+  try { scanHistory = JSON.parse(localStorage.getItem('scanHistory2') || '[]'); } catch(e) { scanHistory = []; }
   try { scriptUrl = localStorage.getItem('scriptUrl') || ''; } catch(e) { scriptUrl = ''; }
 
   window.addEventListener('DOMContentLoaded', () => {
@@ -580,8 +527,7 @@
   function saveScriptUrl() {
     const url = document.getElementById('scriptUrl').value.trim();
     if (!url.startsWith('https://script.google.com/')) {
-      showToast('Invalid Apps Script URL', 'error');
-      return;
+      showToast('Invalid URL', 'error'); return;
     }
     scriptUrl = url;
     try { localStorage.setItem('scriptUrl', url); } catch(e) {}
@@ -590,39 +536,64 @@
     showToast('Connected!', 'success');
   }
 
-  function toggleSetup() {
-    document.getElementById('setupBanner').classList.toggle('show');
-  }
+  function toggleSetup() { document.getElementById('setupBanner').classList.toggle('show'); }
 
-  function setConnected(connected) {
+  function setConnected(c) {
     const pill = document.getElementById('statusPill');
     const text = document.getElementById('statusText');
-    pill.className = 'status-pill ' + (connected ? 'connected' : 'disconnected');
-    text.textContent = connected ? 'Sheet connected' : 'Not connected';
+    pill.className = 'status-pill ' + (c ? 'connected' : 'disconnected');
+    text.textContent = c ? 'Sheet connected' : 'Not connected';
   }
 
-  // ── Mode ──
-  function setMode(m) {
-    mode = m;
-    document.getElementById('modeRapid').className = 'mode-btn' + (m === 'rapid' ? ' active' : '');
-    document.getElementById('modeReview').className = 'mode-btn' + (m === 'review' ? ' active' : '');
-    document.getElementById('modeBadge').textContent = m === 'rapid' ? 'RAPID' : 'REVIEW';
-    document.getElementById('modeBadge').className = 'mode-badge ' + (m === 'rapid' ? 'rapid' : 'manual');
-    // hide panels
-    document.getElementById('reviewPanel').classList.remove('show');
+  function setupSheet() {
+    if (!scriptUrl) { showToast('Connect first', 'error'); return; }
+    showToast('Setting up sheet...', 'info');
+    callScript({ action: 'setup' }, (data) => {
+      if (data && data.status === 'success') {
+        showToast('Sheet structure created!', 'success');
+      } else {
+        showToast('Setup error: ' + (data?.message || 'unknown'), 'error');
+      }
+    });
+  }
+
+  // ── Action Mode ──
+  function setAction(action) {
+    currentAction = action;
+    const isAdd = action === 'add';
+
+    document.getElementById('btnAdd').className = 'action-btn' + (isAdd ? ' active-add' : '');
+    document.getElementById('btnSell').className = 'action-btn' + (isAdd ? '' : ' active-sell');
+
+    document.getElementById('modeBadge').textContent = isAdd ? 'ADD STOCK' : 'MARK SOLD';
+    document.getElementById('modeBadge').className = 'mode-badge ' + (isAdd ? 'badge-add' : 'badge-sell');
+
+    document.getElementById('scannerWrap').className = 'scanner-wrap ' + (isAdd ? 'mode-add' : 'mode-sell');
+
+    document.getElementById('liveCount').className = 'count ' + (isAdd ? 'count-add' : 'count-sell');
+    document.getElementById('counterLabel').textContent = isAdd ? 'items added this session' : 'items marked sold this session';
+
+    if (!isScanning) {
+      document.getElementById('startBtn').className = 'btn ' + (isAdd ? 'btn-go-add' : 'btn-go-sell');
+    }
+
+    // Manual button
+    const mb = document.getElementById('manualBtn');
+    mb.className = isAdd ? 'manual-btn-add' : 'manual-btn-sell';
+    mb.style.background = isAdd ? 'var(--accent-add)' : 'var(--accent-sell)';
+
+    document.getElementById('feedCount').className = 'feed-count ' + (isAdd ? 'feed-count-add' : 'feed-count-sell');
     document.getElementById('lastScan').classList.remove('show');
   }
 
   // ── Scanner ──
-  function toggleScanner() {
-    isScanning ? stopScanner() : startScanner();
-  }
+  function toggleScanner() { isScanning ? stopScanner() : startScanner(); }
 
   function startScanner() {
     scanner = new Html5Qrcode("reader");
-    // Use most of the viewport width for the scan region so long barcodes (IMEI, Code128) fit
     const readerEl = document.getElementById('reader');
     const scanWidth = Math.min(readerEl.clientWidth || 400, 500) - 20;
+
     const config = {
       fps: 15,
       qrbox: { width: scanWidth, height: 150 },
@@ -651,7 +622,6 @@
       isScanning = true;
       document.getElementById('startBtn').innerHTML = '&#9632; Stop Scanning';
       document.getElementById('startBtn').className = 'btn btn-stop';
-      document.getElementById('scannerWrap').classList.add('rapid-active');
     }).catch(err => {
       console.error('Scanner error:', err);
       showToast('Error: ' + (err.message || err), 'error');
@@ -663,131 +633,105 @@
       scanner.stop().then(() => {
         scanner.clear();
         isScanning = false;
+        const isAdd = currentAction === 'add';
         document.getElementById('startBtn').innerHTML = '&#9654; Start Scanning';
-        document.getElementById('startBtn').className = 'btn btn-go';
-        document.getElementById('scannerWrap').classList.remove('rapid-active');
+        document.getElementById('startBtn').className = 'btn ' + (isAdd ? 'btn-go-add' : 'btn-go-sell');
       });
     }
   }
 
-  // ── Scan handler ──
+  // ── Scan Success ──
   function onScanSuccess(decodedText) {
-    // Cooldown: skip if this barcode was scanned recently
     const now = Date.now();
-    if (recentBarcodes.has(decodedText) && (now - recentBarcodes.get(decodedText)) < COOLDOWN_MS) {
-      return;
-    }
+    if (recentBarcodes.has(decodedText) && (now - recentBarcodes.get(decodedText)) < COOLDOWN_MS) return;
     recentBarcodes.set(decodedText, now);
 
-    // Feedback: flash + vibrate + beep
-    flashScreen();
-    if (navigator.vibrate) navigator.vibrate(80);
-    playBeep();
+    // BIG feedback
+    showScanConfirmation(decodedText);
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100]); // double buzz
+    playBeep(currentAction === 'add' ? 1200 : 800);
 
-    if (mode === 'rapid') {
-      rapidScan(decodedText);
-    } else {
-      reviewScan(decodedText);
-    }
+    processScan(decodedText);
   }
 
-  // ── RAPID MODE: scan → auto-send → keep scanning ──
-  async function rapidScan(barcode) {
+  // ── Big confirmation overlay ──
+  function showScanConfirmation(barcode) {
+    const el = document.getElementById('scanConfirm');
+    const isAdd = currentAction === 'add';
+
+    el.className = 'scan-confirm show ' + (isAdd ? 'confirm-add' : 'confirm-sell');
+    document.getElementById('confirmIcon').textContent = isAdd ? '✓' : '🏷️';
+    document.getElementById('confirmLabel').textContent = isAdd ? 'ADDED' : 'SOLD';
+    document.getElementById('confirmBarcode').textContent = barcode;
+    document.getElementById('confirmProduct').textContent = '';
+
+    // Auto-hide after 1.2s
+    setTimeout(() => { el.classList.remove('show'); }, 1200);
+  }
+
+  // ── Process scan ──
+  async function processScan(barcode) {
     sessionCount++;
     document.getElementById('liveCount').textContent = sessionCount;
 
-    // Show last-scan popup immediately
-    document.getElementById('lastBarcode').textContent = barcode;
-    document.getElementById('lastProduct').textContent = 'Looking up...';
-    document.getElementById('lastScan').classList.add('show');
-
+    const isAdd = currentAction === 'add';
     const timestamp = new Date().toLocaleString();
     const item = {
-      barcode: barcode,
+      barcode,
       product: '',
       quantity: 1,
       notes: '',
-      timestamp: timestamp,
+      timestamp,
+      action: currentAction,
       status: 'sending'
     };
 
-    // Add to history immediately
     scanHistory.unshift(item);
     if (scanHistory.length > 100) scanHistory.pop();
     renderFeed();
 
-    // Fire off product lookup + sheet send in parallel
-    const [productName] = await Promise.all([
-      lookupProductFast(barcode),
-      sendToSheet(item)
-    ]);
+    // Show last-scan bar
+    document.getElementById('lastBarcode').textContent = barcode;
+    document.getElementById('lastProduct').textContent = 'Sending...';
+    document.getElementById('lastIcon').className = 'last-scan-icon ' + (isAdd ? 'icon-add' : 'icon-sell');
+    document.getElementById('lastIcon').textContent = isAdd ? '✓' : '🏷️';
+    document.getElementById('lastScan').classList.add('show');
 
-    // Update with product name
+    // Product lookup (only for add mode, sell just needs barcode)
+    let productName = '';
+    if (isAdd) {
+      productName = await lookupProductFast(barcode);
+    }
     item.product = productName;
-    document.getElementById('lastProduct').textContent = productName || 'Unknown product';
-    lastSentItem = item;
 
-    try { localStorage.setItem('scanHistory', JSON.stringify(scanHistory)); } catch(e) {}
-    renderFeed();
-  }
+    // Send to sheet
+    const params = {
+      action: currentAction,
+      barcode: barcode,
+      product: productName || 'Unknown',
+      quantity: 1,
+      notes: '',
+      timestamp: timestamp
+    };
 
-  // ── REVIEW MODE: scan → pause → user confirms ──
-  function reviewScan(barcode) {
-    // Pause scanning while reviewing
-    document.getElementById('reviewPanel').classList.add('show');
-    document.getElementById('reviewBarcode').textContent = barcode;
-    document.getElementById('reviewProduct').textContent = 'Looking up...';
-    document.getElementById('reviewProduct').className = 'review-product loading';
-    document.getElementById('productName').value = '';
-    document.getElementById('itemNotes').value = '';
-    quantity = 1;
-    document.getElementById('qtyValue').textContent = '1';
-
-    lookupProductFast(barcode).then(name => {
-      document.getElementById('reviewProduct').textContent = name || 'Not found — type name below';
-      document.getElementById('reviewProduct').className = 'review-product' + (name ? '' : ' loading');
-      document.getElementById('productName').value = name || '';
+    callScript(params, (data) => {
+      if (data && data.status === 'success') {
+        item.status = 'sent';
+      } else if (data && data.status === 'not_found') {
+        item.status = 'not_found';
+        showToast('No in-stock item with that barcode', 'error');
+      } else {
+        item.status = 'failed';
+      }
+      renderFeed();
     });
 
-    // Store barcode for submit
-    document.getElementById('reviewPanel').dataset.barcode = barcode;
-  }
+    document.getElementById('lastProduct').textContent = productName || (isAdd ? 'Unknown product' : 'Marked as sold');
+    document.getElementById('confirmProduct').textContent = productName || '';
+    lastSentItem = item;
 
-  function submitReview() {
-    const barcode = document.getElementById('reviewPanel').dataset.barcode;
-    const productName = document.getElementById('productName').value || 'Unknown';
-    const notes = document.getElementById('itemNotes').value;
-    const timestamp = new Date().toLocaleString();
-
-    sessionCount++;
-    document.getElementById('liveCount').textContent = sessionCount;
-
-    const item = {
-      barcode: barcode,
-      product: productName,
-      quantity: quantity,
-      notes: notes,
-      timestamp: timestamp,
-      status: 'sending'
-    };
-
-    scanHistory.unshift(item);
-    if (scanHistory.length > 100) scanHistory.pop();
+    try { localStorage.setItem('scanHistory2', JSON.stringify(scanHistory)); } catch(e) {}
     renderFeed();
-
-    sendToSheet(item);
-    try { localStorage.setItem('scanHistory', JSON.stringify(scanHistory)); } catch(e) {}
-
-    document.getElementById('reviewPanel').classList.remove('show');
-  }
-
-  function skipReview() {
-    document.getElementById('reviewPanel').classList.remove('show');
-  }
-
-  function adjustQty(d) {
-    quantity = Math.max(1, quantity + d);
-    document.getElementById('qtyValue').textContent = quantity;
   }
 
   // ── Manual entry ──
@@ -795,121 +739,84 @@
     const barcode = document.getElementById('manualBarcode').value.trim();
     if (!barcode) return;
     document.getElementById('manualBarcode').value = '';
-
-    if (mode === 'rapid') {
-      rapidScan(barcode);
-    } else {
-      reviewScan(barcode);
-    }
+    showScanConfirmation(barcode);
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    playBeep(currentAction === 'add' ? 1200 : 800);
+    processScan(barcode);
   }
 
-  // ── Product lookup (fast, with timeout) ──
+  // ── Product lookup ──
   async function lookupProductFast(barcode) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000); // 4s max
-
+    const timeout = setTimeout(() => controller.abort(), 4000);
     try {
-      const res = await fetch(
-        `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`,
-        { signal: controller.signal }
-      );
+      const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`, { signal: controller.signal });
       clearTimeout(timeout);
       const data = await res.json();
-      if (data.status === 1 && data.product && data.product.product_name) {
-        return data.product.product_name;
-      }
+      if (data.status === 1 && data.product?.product_name) return data.product.product_name;
     } catch(e) { clearTimeout(timeout); }
 
-    // Fallback
-    const controller2 = new AbortController();
-    const timeout2 = setTimeout(() => controller2.abort(), 4000);
+    const c2 = new AbortController();
+    const t2 = setTimeout(() => c2.abort(), 4000);
     try {
-      const res2 = await fetch(
-        `https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`,
-        { signal: controller2.signal }
-      );
-      clearTimeout(timeout2);
-      const data2 = await res2.json();
-      if (data2.items && data2.items.length > 0 && data2.items[0].title) {
-        return data2.items[0].title;
-      }
-    } catch(e) { clearTimeout(timeout2); }
+      const res2 = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`, { signal: c2.signal });
+      clearTimeout(t2);
+      const d2 = await res2.json();
+      if (d2.items?.[0]?.title) return d2.items[0].title;
+    } catch(e) { clearTimeout(t2); }
 
     return '';
   }
 
-  // ── Send to Google Sheet (via GET to avoid CORS redirect issues) ──
-  async function sendToSheet(item) {
-    if (!scriptUrl) {
-      item.status = 'no-sheet';
-      return;
+  // ── Call Apps Script (JSONP) ──
+  function callScript(params, callback) {
+    if (!scriptUrl) { if (callback) callback({ status: 'no-sheet' }); return; }
+
+    const callbackName = '_cb_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+    const timeout = setTimeout(() => { cleanup(); if (callback) callback(null); }, 8000);
+
+    window[callbackName] = function(data) {
+      cleanup();
+      if (callback) callback(data);
+    };
+
+    function cleanup() {
+      clearTimeout(timeout);
+      delete window[callbackName];
+      if (script.parentNode) script.parentNode.removeChild(script);
     }
-    try {
-      const params = new URLSearchParams({
-        barcode: item.barcode,
-        product: item.product || 'Looking up...',
-        quantity: item.quantity,
-        notes: item.notes || '',
-        timestamp: item.timestamp
-      });
-      // Use script injection (JSONP-style) to bypass CORS —
-      // Apps Script redirects break no-cors fetch, but <script> tags follow redirects
-      await new Promise((resolve, reject) => {
-        const callbackName = '_cb_' + Date.now();
-        const timeout = setTimeout(() => { cleanup(); resolve(); }, 5000);
 
-        window[callbackName] = function() { cleanup(); resolve(); };
-
-        function cleanup() {
-          clearTimeout(timeout);
-          delete window[callbackName];
-          if (script.parentNode) script.parentNode.removeChild(script);
-        }
-
-        const script = document.createElement('script');
-        script.src = scriptUrl + '?callback=' + callbackName + '&' + params.toString();
-        script.onerror = function() { cleanup(); resolve(); }; // resolve anyway, best-effort
-        document.body.appendChild(script);
-      });
-      item.status = 'sent';
-    } catch(err) {
-      item.status = 'failed';
-      showToast('Send failed', 'error');
-    }
+    const qs = new URLSearchParams({ callback: callbackName, ...params }).toString();
+    const script = document.createElement('script');
+    script.src = scriptUrl + '?' + qs;
+    script.onerror = function() { cleanup(); if (callback) callback(null); };
+    document.body.appendChild(script);
   }
 
-  // ── Undo last scan ──
+  // ── Undo ──
   async function undoLastScan() {
     if (!lastSentItem) return;
     const removed = lastSentItem;
+
     scanHistory = scanHistory.filter(i => i !== removed);
     sessionCount = Math.max(0, sessionCount - 1);
     document.getElementById('liveCount').textContent = sessionCount;
     document.getElementById('lastScan').classList.remove('show');
     lastSentItem = null;
 
-    // Tell sheet to delete it
-    if (scriptUrl) {
-      try {
-        const params = new URLSearchParams({
-          action: 'undo',
-          barcode: removed.barcode,
-          timestamp: removed.timestamp
-        });
-        const script = document.createElement('script');
-        script.src = scriptUrl + '?' + params.toString();
-        script.onerror = () => script.remove();
-        script.onload = () => script.remove();
-        document.body.appendChild(script);
-      } catch(e) {}
-    }
+    callScript({
+      action: 'undo',
+      undo_type: removed.action,
+      barcode: removed.barcode,
+      timestamp: removed.timestamp
+    }, () => {});
 
-    try { localStorage.setItem('scanHistory', JSON.stringify(scanHistory)); } catch(e) {}
+    try { localStorage.setItem('scanHistory2', JSON.stringify(scanHistory)); } catch(e) {}
     renderFeed();
-    showToast('Scan undone', 'success');
+    showToast('Undone', 'success');
   }
 
-  // ── Render feed ──
+  // ── Feed ──
   function renderFeed() {
     const list = document.getElementById('feedList');
     document.getElementById('feedCount').textContent = scanHistory.length;
@@ -920,60 +827,58 @@
     }
 
     list.innerHTML = scanHistory.slice(0, 30).map(item => {
-      const statusIcon = item.status === 'sent' ? '&#9989;'
-        : item.status === 'failed' ? '&#10060;'
-        : item.status === 'no-sheet' ? '&#9888;'
-        : '&#9203;';
-      const productDisplay = item.product || 'Looking up...';
-      const qtyStr = (item.quantity && item.quantity > 1) ? ` x${item.quantity}` : '';
+      const isAdd = item.action === 'add';
+      const label = isAdd ? 'Added' : 'Sold';
+      const cls = isAdd ? 'fi-action-add' : 'fi-action-sell';
+      const product = item.product || (isAdd ? 'Unknown' : 'Marked sold');
+      const timeStr = item.timestamp ? item.timestamp.split(',').pop().trim() : '';
       return `
         <div class="feed-item">
           <div>
-            <div class="fi-barcode">${item.barcode}${qtyStr}</div>
-            <div class="fi-product">${productDisplay}</div>
+            <div class="fi-barcode">${item.barcode}</div>
+            <div class="fi-product">${product}</div>
           </div>
-          <div class="fi-right">
-            <div class="fi-status">${statusIcon}</div>
-            <div class="fi-time">${item.timestamp.split(',').pop().trim()}</div>
+          <div style="text-align:right;">
+            <span class="fi-action ${cls}">${label}</span>
+            <div class="fi-time">${timeStr}</div>
           </div>
         </div>`;
     }).join('');
   }
 
-  // ── Feedback helpers ──
-  function flashScreen() {
-    const el = document.getElementById('scanFlash');
-    el.classList.add('active');
-    setTimeout(() => el.classList.remove('active'), 150);
-  }
-
-  function playBeep() {
+  // ── Audio ──
+  function playBeep(freq) {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.frequency.value = 1400;
-      gain.gain.value = 0.25;
+      osc.frequency.value = freq;
+      gain.gain.value = 0.4;
       osc.start();
-      osc.stop(ctx.currentTime + 0.08);
+      // Quick double beep
+      gain.gain.setValueAtTime(0.4, ctx.currentTime);
+      gain.gain.setValueAtTime(0, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.4, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0, ctx.currentTime + 0.2);
+      osc.stop(ctx.currentTime + 0.25);
     } catch(e) {}
   }
 
-  function showToast(message, type) {
-    const toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.className = 'toast ' + type + ' show';
-    setTimeout(() => toast.classList.remove('show'), 2000);
+  function showToast(msg, type) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast ' + type + ' show';
+    setTimeout(() => t.classList.remove('show'), 2500);
   }
 
-  // Register service worker for PWA
+  // PWA
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
 
-  // Clean up old cooldowns every 10s
+  // Cooldown cleanup
   setInterval(() => {
     const now = Date.now();
     for (const [k, v] of recentBarcodes) {
