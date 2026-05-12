@@ -643,14 +643,7 @@
     };
 
     scanner.start(
-      {
-        facingMode: "environment",
-        advanced: [
-          { width: { ideal: 1920 } },
-          { height: { ideal: 1080 } },
-          { focusMode: "continuous" }
-        ]
-      },
+      { facingMode: "environment" },
       config,
       onScanSuccess,
       () => {}
@@ -660,7 +653,8 @@
       document.getElementById('startBtn').className = 'btn btn-stop';
       document.getElementById('scannerWrap').classList.add('rapid-active');
     }).catch(err => {
-      showToast('Camera access denied', 'error');
+      console.error('Scanner error:', err);
+      showToast('Error: ' + (err.message || err), 'error');
     });
   }
 
