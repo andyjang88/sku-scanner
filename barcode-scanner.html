@@ -620,9 +620,13 @@
 
   function startScanner() {
     scanner = new Html5Qrcode("reader");
+    // Use most of the viewport width for the scan region so long barcodes (IMEI, Code128) fit
+    const readerEl = document.getElementById('reader');
+    const scanWidth = Math.min(readerEl.clientWidth || 400, 500) - 20;
     const config = {
-      fps: 15, // higher FPS for speed
-      qrbox: { width: 280, height: 100 },
+      fps: 15,
+      qrbox: { width: scanWidth, height: 150 },
+      aspectRatio: 1.5,
       formatsToSupport: [
         Html5QrcodeSupportedFormats.UPC_A,
         Html5QrcodeSupportedFormats.UPC_E,
@@ -630,12 +634,23 @@
         Html5QrcodeSupportedFormats.EAN_8,
         Html5QrcodeSupportedFormats.CODE_128,
         Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.ITF
+        Html5QrcodeSupportedFormats.CODE_93,
+        Html5QrcodeSupportedFormats.CODABAR,
+        Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.DATA_MATRIX,
+        Html5QrcodeSupportedFormats.QR_CODE
       ]
     };
 
     scanner.start(
-      { facingMode: "environment" },
+      {
+        facingMode: "environment",
+        advanced: [
+          { width: { ideal: 1920 } },
+          { height: { ideal: 1080 } },
+          { focusMode: "continuous" }
+        ]
+      },
       config,
       onScanSuccess,
       () => {}
@@ -829,24 +844,38 @@
     return '';
   }
 
-  // ── Send to Google Sheet ──
+  // ── Send to Google Sheet (via GET to avoid CORS redirect issues) ──
   async function sendToSheet(item) {
     if (!scriptUrl) {
       item.status = 'no-sheet';
       return;
     }
     try {
-      await fetch(scriptUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({
-          barcode: item.barcode,
-          product: item.product || 'Looking up...',
-          quantity: item.quantity,
-          notes: item.notes,
-          timestamp: item.timestamp
-        })
+      const params = new URLSearchParams({
+        barcode: item.barcode,
+        product: item.product || 'Looking up...',
+        quantity: item.quantity,
+        notes: item.notes || '',
+        timestamp: item.timestamp
+      });
+      // Use script injection (JSONP-style) to bypass CORS —
+      // Apps Script redirects break no-cors fetch, but <script> tags follow redirects
+      await new Promise((resolve, reject) => {
+        const callbackName = '_cb_' + Date.now();
+        const timeout = setTimeout(() => { cleanup(); resolve(); }, 5000);
+
+        window[callbackName] = function() { cleanup(); resolve(); };
+
+        function cleanup() {
+          clearTimeout(timeout);
+          delete window[callbackName];
+          if (script.parentNode) script.parentNode.removeChild(script);
+        }
+
+        const script = document.createElement('script');
+        script.src = scriptUrl + '?callback=' + callbackName + '&' + params.toString();
+        script.onerror = function() { cleanup(); resolve(); }; // resolve anyway, best-effort
+        document.body.appendChild(script);
       });
       item.status = 'sent';
     } catch(err) {
@@ -868,12 +897,16 @@
     // Tell sheet to delete it
     if (scriptUrl) {
       try {
-        await fetch(scriptUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'undo', barcode: removed.barcode, timestamp: removed.timestamp })
+        const params = new URLSearchParams({
+          action: 'undo',
+          barcode: removed.barcode,
+          timestamp: removed.timestamp
         });
+        const script = document.createElement('script');
+        script.src = scriptUrl + '?' + params.toString();
+        script.onerror = () => script.remove();
+        script.onload = () => script.remove();
+        document.body.appendChild(script);
       } catch(e) {}
     }
 
